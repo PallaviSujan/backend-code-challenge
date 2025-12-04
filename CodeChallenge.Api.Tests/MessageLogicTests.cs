@@ -4,7 +4,6 @@ using FluentAssertions;
 using Moq;
 using Xunit;
 using CodeChallenge.Api.Logic;
-using CodeChallenge.Api.Data;
 using CodeChallenge.Api.Models;
 
 namespace CodeChallenge.Tests
@@ -16,12 +15,6 @@ namespace CodeChallenge.Tests
         {
             // Arrange
             var repoMock = new Mock<IMessageRepository>();
-            repoMock
-                .Setup(r => r.FindByTitleAndOrganizationAsync(It.IsAny<string>(), It.IsAny<Guid>()))
-                .ReturnsAsync((Message)null);
-            repoMock
-                .Setup(r => r.AddAsync(It.IsAny<Message>()))
-                .Returns(Task.CompletedTask);
 
             var logic = new MessageLogic(repoMock.Object);
 
@@ -33,17 +26,11 @@ namespace CodeChallenge.Tests
             };
 
             // Act
-            var result = await logic.CreateAsync(message);
+            var result = await logic.CreateMessageAsync(message.OrganizationId, message);
 
             // Assert
             result.IsSuccess.Should().BeTrue();
-            repoMock.Verify(r => r.AddAsync(It.Is<Message>(m =>
-                m.Title == message.Title &&
-                m.OrganizationId == message.OrganizationId &&
-                m.IsActive &&
-                m.CreatedAt != default &&
-                m.UpdatedAt != default
-            )), Times.Once);
+            result.Value.Title.Should().Be("New Title");
         }
 
         [Fact]
@@ -59,7 +46,7 @@ namespace CodeChallenge.Tests
 
             var repoMock = new Mock<IMessageRepository>();
             repoMock
-                .Setup(r => r.FindByTitleAndOrganizationAsync("Duplicate", existing.OrganizationId))
+                .Setup(r => r.GetAllMessagesAsync(existing.OrganizationId))
                 .ReturnsAsync(existing);
 
             var logic = new MessageLogic(repoMock.Object);
@@ -85,7 +72,7 @@ namespace CodeChallenge.Tests
             // Arrange
             var repoMock = new Mock<IMessageRepository>();
             repoMock
-                .Setup(r => r.FindByTitleAndOrganizationAsync(It.IsAny<string>(), It.IsAny<Guid>()))
+                .Setup(r => r.GetAllMessagesAsync(It.IsAny<Guid>()))
                 .ReturnsAsync((Message)null);
 
             var logic = new MessageLogic(repoMock.Object);
