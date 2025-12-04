@@ -24,10 +24,15 @@ namespace CodeChallenge.Tests
                 Content = new string('x', 20),
             };
 
+            var request = new CreateMessageRequest { Title = "Valid Title", Content = "This content is long enough to succeed." };
+            repoMock.Setup(r => r.GetByTitleAsync(It.IsAny<Guid>(), "Valid Title")).ReturnsAsync((Message?)null);
+
             // Act
             var result = await logic.CreateMessageAsync(Guid.NewGuid(), message);
 
             Assert.True(result is Success);
+            var created = (Created<Message>)result;
+            Assert.Equal(created.Value.Title, message.Title);
 
         }
 
@@ -39,12 +44,12 @@ namespace CodeChallenge.Tests
             {
                 Id = Guid.NewGuid(),
                 Title = "Duplicate",
-                OrganizationId = Guid.NewGuid()
+                OrganizationId = Guid.NewGuid(),
             };
 
             var repoMock = new Mock<IMessageRepository>();
             repoMock
-                .Setup(r => r.GetByIdAsync(existing.OrganizationId, existing.Id))
+                .Setup(r => r.GetByTitleAsync(existing.OrganizationId, existing.Title))
                 .ReturnsAsync(existing);
 
             var logic = new MessageLogic(repoMock.Object);
@@ -57,9 +62,11 @@ namespace CodeChallenge.Tests
 
             // Act
             var result = await logic.CreateMessageAsync(Guid.NewGuid(), toCreate);
+            var error = ((Conflict)result).Message;
 
             // Assert
             Assert.False(result is Success);
+            Assert.Equal("A message with this title already exists in the organization.", error);
         }
 
         [Fact]
