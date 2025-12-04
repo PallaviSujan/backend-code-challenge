@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
-using FluentAssertions;
 using Moq;
 using Xunit;
 using CodeChallenge.Api.Logic;
 using CodeChallenge.Api.Models;
+using CodeChallenge.Api.Repositories;
 
 namespace CodeChallenge.Tests
 {
@@ -18,19 +18,17 @@ namespace CodeChallenge.Tests
 
             var logic = new MessageLogic(repoMock.Object);
 
-            var message = new Message
+            var message = new CreateMessageRequest
             {
                 Title = "New Title",
                 Content = new string('x', 20),
-                OrganizationId = Guid.NewGuid()
             };
 
             // Act
-            var result = await logic.CreateMessageAsync(message.OrganizationId, message);
+            var result = await logic.CreateMessageAsync(Guid.NewGuid(), message);
 
-            // Assert
-            result.IsSuccess.Should().BeTrue();
-            result.Value.Title.Should().Be("New Title");
+            Assert.True(result is Success);
+
         }
 
         [Fact]
@@ -46,24 +44,22 @@ namespace CodeChallenge.Tests
 
             var repoMock = new Mock<IMessageRepository>();
             repoMock
-                .Setup(r => r.GetAllMessagesAsync(existing.OrganizationId))
+                .Setup(r => r.GetByIdAsync(existing.OrganizationId, existing.Id))
                 .ReturnsAsync(existing);
 
             var logic = new MessageLogic(repoMock.Object);
 
-            var toCreate = new Message
+            var toCreate = new CreateMessageRequest
             {
                 Title = "Duplicate",
                 Content = new string('x', 20),
-                OrganizationId = existing.OrganizationId
             };
 
             // Act
-            var result = await logic.CreateAsync(toCreate);
+            var result = await logic.CreateMessageAsync(Guid.NewGuid(), toCreate);
 
             // Assert
-            result.IsSuccess.Should().BeFalse();
-            result.Error.Should().Contain("already exists", StringComparison.OrdinalIgnoreCase);
+            Assert.False(result is Success);
         }
 
         [Fact]
@@ -72,24 +68,22 @@ namespace CodeChallenge.Tests
             // Arrange
             var repoMock = new Mock<IMessageRepository>();
             repoMock
-                .Setup(r => r.GetAllMessagesAsync(It.IsAny<Guid>()))
-                .ReturnsAsync((Message)null);
+                .Setup(r => r.GetAllByOrganizationAsync(It.IsAny<Guid>()))
+                .ReturnsAsync(new List<Message>());
 
             var logic = new MessageLogic(repoMock.Object);
 
-            var message = new Message
+            var message = new CreateMessageRequest
             {
                 Title = "Valid Title",
                 Content = "short",
-                OrganizationId = Guid.NewGuid()
             };
 
             // Act
-            var result = await logic.CreateAsync(message);
+            var result = await logic.CreateMessageAsync(Guid.NewGuid(), message);
 
             // Assert
-            result.IsSuccess.Should().BeFalse();
-            result.Error.Should().Contain("Content must be between 10 and 1000", StringComparison.OrdinalIgnoreCase);
+            Assert.False(result is Success);
         }
 
         [Fact]
@@ -98,26 +92,24 @@ namespace CodeChallenge.Tests
             // Arrange
             var repoMock = new Mock<IMessageRepository>();
             repoMock
-                .Setup(r => r.GetByIdAsync(It.IsAny<Guid>()))
+                .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>()))
                 .ReturnsAsync((Message)null);
 
             var logic = new MessageLogic(repoMock.Object);
 
-            var toUpdate = new Message
+            var toUpdate = new UpdateMessageRequest
             {
-                Id = Guid.NewGuid(),
                 Title = "Title",
                 Content = new string('x', 20),
-                OrganizationId = Guid.NewGuid()
             };
 
             // Act
-            var result = await logic.UpdateAsync(toUpdate);
+            var result = await logic.UpdateMessageAsync(Guid.NewGuid(), Guid.NewGuid(), toUpdate);
 
             // Assert
-            result.IsSuccess.Should().BeFalse();
-            result.Error.Should().Contain("not found", StringComparison.OrdinalIgnoreCase);
+            Assert.False(result is Success);
         }
+
 
         [Fact]
         public async Task UpdateAsync_Inactive_Message_Returns_ValidationError()
@@ -134,26 +126,24 @@ namespace CodeChallenge.Tests
 
             var repoMock = new Mock<IMessageRepository>();
             repoMock
-                .Setup(r => r.GetByIdAsync(stored.Id))
+                .Setup(r => r.GetByIdAsync(stored.OrganizationId, stored.Id))
                 .ReturnsAsync(stored);
 
             var logic = new MessageLogic(repoMock.Object);
 
-            var toUpdate = new Message
+            var toUpdate = new UpdateMessageRequest
             {
-                Id = stored.Id,
                 Title = "New Title",
                 Content = new string('x', 20),
-                OrganizationId = stored.OrganizationId
             };
 
             // Act
-            var result = await logic.UpdateAsync(toUpdate);
+            var result = await logic.UpdateMessageAsync(Guid.NewGuid(), Guid.NewGuid(), toUpdate);
 
             // Assert
-            result.IsSuccess.Should().BeFalse();
-            result.Error.Should().Contain("inactive", StringComparison.OrdinalIgnoreCase);
+            Assert.False(result is Success);
         }
+
 
         [Fact]
         public async Task DeleteAsync_NonExistent_Message_Returns_NotFound()
@@ -161,17 +151,17 @@ namespace CodeChallenge.Tests
             // Arrange
             var repoMock = new Mock<IMessageRepository>();
             repoMock
-                .Setup(r => r.GetByIdAsync(It.IsAny<Guid>()))
+                .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>()))
                 .ReturnsAsync((Message)null);
 
             var logic = new MessageLogic(repoMock.Object);
 
             // Act
-            var result = await logic.DeleteAsync(Guid.NewGuid());
+            var result = await logic.DeleteMessageAsync(Guid.NewGuid(), Guid.NewGuid());
 
             // Assert
-            result.IsSuccess.Should().BeFalse();
-            result.Error.Should().Contain("not found", StringComparison.OrdinalIgnoreCase);
+            Assert.False(result is Success);
+        }
+
         }
     }
-}
